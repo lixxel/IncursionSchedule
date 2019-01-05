@@ -1,3 +1,8 @@
+/*
+@author Steph AKA Lixx
+{@link https://github.com/stephannapolis GitHub}.
+*/
+
 
 //POST_URL is the webhook URL. If you're using discord, follow this: https://support.discordapp.com/hc/en-us/articles/228383668-Intro-to-Webhooks
 var POST_URL = "";
