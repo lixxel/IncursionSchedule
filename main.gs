@@ -1,26 +1,63 @@
+/**
+ * Sends a POST (In this case, Discord webhook) to announce WoW BfA incursions AKA assaults.
+ * 
+ * 
+ *
+ * @author Steph AKA Lixx.
+ * @link https://github.com/stephannapolis GitHub
+ */
+
+
 /*
-@author Steph AKA Lixx
-{@link https://github.com/stephannapolis GitHub}.
+LIVE
 */
 
+POST_URL = "";
+//roleID = "";
 
-//POST_URL is the webhook URL. If you're using discord, follow this: https://support.discordapp.com/hc/en-us/articles/228383668-Intro-to-Webhooks
-var POST_URL = "";
-var roleID = ""; //find roleID by typing \@Role_Name. Will be in format <@&##################>
+/*
+TEST
+POST_URL is the webhook URL. https://support.discordapp.com/hc/en-us/articles/228383668-Intro-to-Webhooks
+*/
 
-var incursionZone = ["Drustvar", "Zuldazar", "Tirigarde Sound", "Nazmir", "Stormsong Valley", "Vol'dun"];
+//POST_URL = "";
+//roleID = ""; //find roleID by typing \@Role_Name. Will be in format <@&##################>
 
-function myFunction() {
+
+daylightSavings = 1; // 1 if spring-fall, 0 if fall-spring
+timeZone = -8 + daylightSavings; // Server time zone offset
+localTimeZone = -5 + daylightSavings;
+
+fullCycleHours = 19; // Number of hours from the beginning of one invasion to the beginning of the next invasion
+invasionUpHours = 7; // Number of hours the invasion is up each time
+
+epochOffset = 3600; // Calculated by taking [one valid start time epoch timestamp] % cycleTime
+
+incursionZone = ["Drustvar", "Zuldazar", "Tirigarde Sound", "Nazmir", "Stormsong Valley", "Vol'dun"];
+
+function incursionTimer() {
   var d = new Date();
   var timeStamp = d.getTime()/1000;  // Number of sec since Jan 1, 1970
-  p = 60 * 60 * 1000; //ms per hour
+  secHour = 3600; //seconds per hour
+  p = secHour * 1000; //ms per hour
+  cycleTime = fullCycleHours * secHour; // seconds per cycle
+  numberOfZones = incursionZone.length;
+
+  invasionDownHours = fullCycleHours - invasionUpHours;
+  
   
   var zoneID = 0;
   
-  if (67500<timeStamp%68400 || timeStamp%68400<900){ //if between 15 before epoch and 15 after epoch
-    zoneID = Math.round((timeStamp%410400)/68400);
+  /*
+  INVASION IN ONE HOUR
+  */
+  if ((epochOffset-900-secHour)%cycleTime<timeStamp%cycleTime && timeStamp%cycleTime<(epochOffset+900-secHour)%cycleTime){ //if between 1.25 before and 45 before
+    zoneID = Math.round((timeStamp%(numberOfZones*cycleTime)-(epochOffset-secHour))/cycleTime);
     var options = {
       "method": "post",
+      "headers": {
+        "Content-Type": "application/json",
+      },
       "payload": JSON.stringify({
         //"content" : roleID,
         "embeds": [{
@@ -32,44 +69,64 @@ function myFunction() {
 
     UrlFetchApp.fetch(POST_URL, options);
   }
-  else if (2700<timeStamp%68400 && timeStamp%68400<4500){ //if between 45 after epoch and 1.25 after epoch
-    zoneID = Math.round(((timeStamp%410400)-3600)/68400);
+  /*
+  INVASION IS UP
+  */
+  else if ((epochOffset-900)%cycleTime<timeStamp%cycleTime && timeStamp%cycleTime<(epochOffset+900)%cycleTime){ //if between 15 before and 15 after
+    zoneID = Math.round((timeStamp%(numberOfZones*cycleTime)-epochOffset)/cycleTime);
     
     localOffset = d.getTimezoneOffset() * 60000;
-    serverOffset = -4 * p;
-    date = new Date(Math.round(d.getTime()/p+7)*p + localOffset + serverOffset); //7 hours from now  
+    serverOffset = timeZone * p;
+    date = new Date(Math.round(d.getTime()/p+invasionUpHours)*p + localOffset + serverOffset); //invasionUp hours from now, start of next invasion
+    estDate = new Date(date.getTime());
+    estDate.setHours(estDate.getHours() - timeZone + localTimeZone);
+    estDateString = estDate.toLocaleTimeString();
+    estIncursionTime = estDateString.slice(0,-10) + " " + estDateString.slice(-6,-4);
     dateString = date.toLocaleTimeString();
-    var nextIncursionTime = dateString.slice(0,-10) + " " + dateString.slice(8,10);
+    var nextIncursionTime = dateString.slice(0,-10) + " " + dateString.slice(-6,-4);
     
     var options = {
       "method": "post",
+      "headers": {
+        "Content-Type": "application/json",
+      },
       "payload": JSON.stringify({
         //"content" : roleID,
         "embeds": [{
           "title": "Incursion is up!",
-          "description": "Location: **"+ incursionZone[zoneID] +"**, ending at " + nextIncursionTime + " server."
+          "description": "Location: **"+ incursionZone[zoneID] +"**, ending at " + nextIncursionTime + " server (" + estIncursionTime + " EST)."
                    }]
       })
     };
 
     UrlFetchApp.fetch(POST_URL, options);
   }
-  else if (27900<timeStamp%68400 && timeStamp%68400<29700){ //if between 7.75 after epoch and 8.25 after epoch
-    zoneID = Math.round(((timeStamp+39600)%410400)/68400);
+  /*
+  INVASION ENDED
+  */
+  else if ((epochOffset-900+(invasionUpHours*secHour))%cycleTime<timeStamp%cycleTime && timeStamp%cycleTime<(epochOffset+900+(invasionUpHours*secHour))%cycleTime){ //if between 15 before and 15 after end of invasion
+    zoneID = Math.round(((timeStamp+invasionDownHours*secHour)%(numberOfZones*cycleTime)-epochOffset)/cycleTime);
     
     localOffset = d.getTimezoneOffset() * 60000;
-    serverOffset = -4 * p;
-    date = new Date(Math.round(d.getTime()/p+12)*p + localOffset + serverOffset); //12 hours from now  
+    serverOffset = timeZone * p;
+    date = new Date(Math.round(d.getTime()/p+invasionDownHours)*p + localOffset + serverOffset); //invasionDownHours hours from now, end of invasion
+    estDate = new Date(date.getTime());
+    estDate.setHours(estDate.getHours() - timeZone + localTimeZone);
+    estDateString = estDate.toLocaleTimeString();
+    estIncursionTime = estDateString.slice(0,-10) + " " + estDateString.slice(-6,-4);
     dateString = date.toLocaleTimeString();
-    var nextIncursionTime = dateString.slice(0,-10) + " " + dateString.slice(8,10);
+    var nextIncursionTime = dateString.slice(0,-10) + " " + dateString.slice(-6,-4);
     
     var options = {
       "method": "post",
+      "headers": {
+        "Content-Type": "application/json",
+      },
       "payload": JSON.stringify({
         //"content" : roleID,
         "embeds": [{
           "title": "Incursion ended!",
-          "description": "Next one will be at "+ nextIncursionTime +" server in **"+ incursionZone[zoneID] +"**."
+          "description": "Next one will be at "+ nextIncursionTime +" server (" + estIncursionTime + " EST) in **"+ incursionZone[zoneID] +"**."
                    }]
       })
     };
@@ -80,8 +137,8 @@ function myFunction() {
   
 }
 
-function createTrigger(){
-  ScriptApp.newTrigger("myFunction")
+function createIncursionTrigger(){
+  ScriptApp.newTrigger("incursionTimer")
     .timeBased()
     .everyHours(1).nearMinute(0)
     .create(); 
