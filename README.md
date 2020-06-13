@@ -11,5 +11,3 @@ Role ID is found by typing ```\@Role_Name``` in your discord channel. Will be in
 Run ```createTrigger()``` once to begin the hourly check. If you make any mistakes, run ```deleteTrigger()``` to clear out the triggers.
 
 ![Incursion Schedule](IncursionSchedule.PNG?raw=true "Incursion Schedule")
-
-I plan to extend this to include Legion invasions as well.
